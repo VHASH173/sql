@@ -1,0 +1,16 @@
+{
+  "name": "transity-backend",
+  "version": "1.0.0",
+  "main": "TransityDB.js",
+  "scripts": {
+    "start": "node TransityDB.js",
+    "check": "node --check TransityDB.js"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "mysql2": "^3.15.2",
+    "socket.io": "^4.8.1"
+  }
+}
