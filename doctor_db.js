@@ -139,7 +139,7 @@ const tables = {
           driver_id int NOT NULL,
           balance decimal(10,2) DEFAULT '0.00',
           total_completed_bookings int DEFAULT '0',
-          commission_rate decimal(5,2) DEFAULT '18.00',
+          commission_rate decimal(5,2) DEFAULT '10.00',
           created_at timestamp NULL DEFAULT CURRENT_TIMESTAMP,
           updated_at timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           PRIMARY KEY (wallet_id),

@@ -109,7 +109,7 @@ const PROFILE_REGION_OPTIONS = [
 ];
 const ACTIVE_BOOKING_STATUSES = ['Accepted', 'In Progress'];
 const FINAL_DISCOUNT_MINIMUM_FARE = 80.0;
-const DEFAULT_DRIVER_COMMISSION_RATE = 18.0;
+const DEFAULT_DRIVER_COMMISSION_RATE = 10.0;
 const REDUCED_DRIVER_COMMISSION_RATE = 15.0;
 const REDUCED_DRIVER_COMMISSION_THRESHOLD = 8;
 const FIRST_DRIVER_TOP_UP_MINIMUM = 300.0;
@@ -1970,6 +1970,7 @@ app.put('/booking/:id/status', async (req, res) => {
     const bookingId = parseId(req.params.id);
     const normalizedStatus = normalizeBookingStatus(req.body?.status);
     const requestedDriverId = parseId(req.body?.driver_id);
+    const bidFare = req.body?.final_fare ? Number(req.body.final_fare) : null;
 
     if (!bookingId) {
       return res.status(400).json({ error: 'Invalid booking_id' });
@@ -2020,13 +2021,17 @@ app.put('/booking/:id/status', async (req, res) => {
 
       assignedDriverId = driver.driver_id;
       driverUserId = driver.user_id;
+
+      // Si el conductor envió una contra-oferta (Bot), actualizamos el precio final en la tabla
+      const finalFareToUse = bidFare || booking.estimated_fare;
+
       updateQuery = `
         UPDATE booking
-        SET status = ?, driver_id = ?
+        SET status = ?, driver_id = ?, final_fare = ?
         WHERE booking_id = ?
           AND (driver_id IS NULL OR driver_id = ?)
       `;
-      updateParams = [normalizedStatus, assignedDriverId, bookingId, assignedDriverId];
+      updateParams = [normalizedStatus, assignedDriverId, finalFareToUse, bookingId, assignedDriverId];
     }
 
     const [updateResult] = await db.query(updateQuery, updateParams);
