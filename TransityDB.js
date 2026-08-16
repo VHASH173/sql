@@ -5,6 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Server } = require('socket.io');
+const rateLimit = require('express-rate-limit');
 
 function loadLocalEnvFile() {
   const envPath = path.join(__dirname, '.env');
@@ -56,27 +57,55 @@ const io = new Server(server, {
   }
 });
 
+// Middlewares de Ciberseguridad (Rate Limiting)
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // Límite de 100 peticiones por IP
+  message: { error: 'Demasiadas peticiones desde esta IP, por favor intenta de nuevo en 15 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const authLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutos
+  max: 5, // Límite de 5 intentos
+  message: { error: 'Demasiados intentos de acceso o registro, por favor intenta de nuevo en 10 minutos.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const PORT = Number(process.env.PORT || 3000);
 const SALT_ROUNDS = 10;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REGEX = /^\+63\d{10}$/;
+const PHONE_REGEX = /^\+51\d{9}$/;
 const PROFILE_GENDER_OPTIONS = ['Male', 'Female', 'Others', 'Prefer not say'];
 const PROFILE_REGION_OPTIONS = [
-  'NCR \u2013 National Capital Region',
-  'Region I \u2013 Ilocos Region',
-  'Region II \u2013 Cagayan Valley',
-  'Region III \u2013 Central Luzon',
-  'Region IV-A \u2013 CALABARZON',
-  'MIMAROPA Region',
-  'Region V \u2013 Bicol Region',
-  'Region VI \u2013 Western Visayas',
-  'Region VII \u2013 Central Visayas',
-  'Region VIII \u2013 Eastern Visayas',
-  'Region IX \u2013 Zamboanga Peninsula',
-  'Region X \u2013 Northern Mindanao',
-  'Region XI \u2013 Davao Region',
-  'Region XII \u2013 SOCCSKSARGEN',
-  'Region XIII \u2013 Caraga'
+  'Amazonas',
+  'Ancash',
+  'Apurímac',
+  'Arequipa',
+  'Ayacucho',
+  'Cajamarca',
+  'Callao',
+  'Cusco',
+  'Huancavelica',
+  'Huánuco',
+  'Ica',
+  'Junín',
+  'La Libertad',
+  'Lambayeque',
+  'Lima Metropolitana',
+  'Lima Provincias',
+  'Loreto',
+  'Madre de Dios',
+  'Moquegua',
+  'Pasco',
+  'Piura',
+  'Puno',
+  'San Martín',
+  'Tacna',
+  'Tumbes',
+  'Ucayali'
 ];
 const ACTIVE_BOOKING_STATUSES = ['Accepted', 'In Progress'];
 const FINAL_DISCOUNT_MINIMUM_FARE = 80.0;
@@ -99,6 +128,7 @@ const CUSTOMER_REWARD_RULES = [
 ];
 const DISCOUNT_REQUEST_METADATA_DIR = path.join(__dirname, 'discount_request_assets');
 
+app.use(globalLimiter); // Aplicar límite global a todas las rutas
 app.use(express.json({ limit: '2mb' }));
 
 const db = mysql.createPool({
@@ -107,6 +137,9 @@ const db = mysql.createPool({
   user: requireEnv('DB_USER'),
   password: requireEnv('DB_PASSWORD'),
   database: requireEnv('DB_NAME'),
+  ssl: {
+    rejectUnauthorized: false
+  },
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
@@ -486,7 +519,7 @@ function validateMinimumFareForFare(minimumFare, currentFare) {
     return 'Minimum fare requirement is too high for this booking.';
   }
   if (normalizedFare < normalizedMinimumFare) {
-    return `This promo requires a minimum fare of PHP ${normalizedMinimumFare.toFixed(2)}.`;
+    return `This promo requires a minimum fare of S/. ${normalizedMinimumFare.toFixed(2)}.`;
   }
   return '';
 }
@@ -1038,7 +1071,7 @@ app.get('/test', async (req, res) => {
   }
 });
 
-app.post('/signup', async (req, res) => {
+app.post('/signup', authLimiter, async (req, res) => {
   try {
     const { first_name, last_name, email_address, password } = req.body;
     if (!first_name || !last_name || !email_address || !password) {
@@ -1089,7 +1122,7 @@ app.post('/signup', async (req, res) => {
   }
 });
 
-app.post('/login', async (req, res) => {
+app.post('/login', authLimiter, async (req, res) => {
   try {
     const { email_address, password } = req.body;
     if (!email_address || !password) {
@@ -1151,8 +1184,8 @@ app.get('/profile/:user_id', async (req, res) => {
     results[0].picture = normalizeUserPicture(results[0].picture);
     res.json(results[0]);
   } catch (error) {
-    console.error('Profile error:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('DATABASE_ERROR [Profile]:', error.message);
+    res.status(500).json({ error: `Server error: ${error.code || 'Unknown'}` });
   }
 });
 
@@ -1187,7 +1220,7 @@ app.put('/profile/:user_id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid email format' });
     }
     if (profile.phone && !PHONE_REGEX.test(profile.phone)) {
-      return res.status(400).json({ error: 'Phone must be stored in +63 format' });
+      return res.status(400).json({ error: 'El teléfono debe tener formato +51 y 9 dígitos' });
     }
     if (profile.gender && !PROFILE_GENDER_OPTIONS.includes(profile.gender)) {
       return res.status(400).json({ error: 'Gender value is not allowed by the database' });
@@ -1284,7 +1317,7 @@ app.put('/profile/:user_id/phone-verification', async (req, res) => {
     const phone = String(req.body.phone || '').trim();
     const phoneVerified = Number(req.body.phone_verified) === 1 ? 1 : 0;
     if (!phone || !PHONE_REGEX.test(phone)) {
-      return res.status(400).json({ error: 'Phone must be stored in +63 format' });
+      return res.status(400).json({ error: 'El teléfono debe tener formato +51 y 9 dígitos' });
     }
 
     const [updateResult] = await db.query(
@@ -2210,7 +2243,7 @@ app.post('/driver/wallet/topup', async (req, res) => {
       await connection.rollback();
       connection.release();
       return res.status(400).json({
-        error: `Minimum top-up amount is PHP ${minimumTopUpAmount.toFixed(2)}.`,
+        error: `Minimum top-up amount is S/. ${minimumTopUpAmount.toFixed(2)}.`,
         minimum_top_up_amount: minimumTopUpAmount,
         has_previous_top_up: hasPreviousTopUp
       });
@@ -2236,7 +2269,7 @@ app.post('/driver/wallet/topup', async (req, res) => {
         )
         VALUES (?, 'TOPUP', ?, NULL, ?, NOW())
       `,
-      [wallet.wallet_id, amount, `Driver wallet top-up of PHP ${amount.toFixed(2)}`]
+      [wallet.wallet_id, amount, `Driver wallet top-up of S/. ${amount.toFixed(2)}`]
     );
     await connection.commit();
     connection.release();
@@ -2358,7 +2391,7 @@ app.post('/promo/validate', async (req, res) => {
     }
     const minimumFare = parseMoney(promo.minimum_fare) || 0;
     if (minimumFare > 0 && estimatedFare < minimumFare) {
-      return res.status(400).json({ error: `This promo requires a minimum fare of PHP ${minimumFare.toFixed(2)}.` });
+      return res.status(400).json({ error: `This promo requires a minimum fare of S/. ${minimumFare.toFixed(2)}.` });
     }
 
     const [existingRedemptions] = await db.query(
@@ -2425,6 +2458,12 @@ app.get('/discount/request/:user_id', async (req, res) => {
     const userId = parseId(req.params.user_id);
     if (!userId) {
       return res.status(400).json({ error: 'Invalid user_id' });
+    }
+
+    // Verificamos si la tabla existe antes de consultar
+    const [tableExists] = await db.query("SHOW TABLES LIKE 'discount_requests'");
+    if (tableExists.length === 0) {
+       return res.json([]); // Retornamos lista vacía si la tabla no existe aún
     }
 
     const [rows] = await db.query(
@@ -3018,7 +3057,7 @@ app.post('/transaction/complete', async (req, res) => {
     const qualifiesForFinalDiscount = rawFinalFare >= finalDiscountMinimumFare;
 
     if (!qualifiesForFinalDiscount && hadSelectedDiscount) {
-      discountVoidedReason = `Discount voided because final fare is below PHP ${finalDiscountMinimumFare.toFixed(2)}.`;
+      discountVoidedReason = `Discount voided because final fare is below S/. ${finalDiscountMinimumFare.toFixed(2)}.`;
     }
 
     if (qualifiesForFinalDiscount && tripPayload.voucher_id) {
@@ -3784,6 +3823,41 @@ app.put('/admin/tickets/:ticketId/status', async (req, res) => {
   }
 });
 
+// Endpoint de Webhook para MetaMap (KYC)
+app.post('/api/webhooks/metamap', async (req, res) => {
+  try {
+    const { eventName, status, metadata } = req.body;
+    console.log(`METAMAP_WEBHOOK: Recibido evento ${eventName} con estado ${status}`);
+
+    if (status === 'verified') {
+      const userId = parseId(metadata?.userId);
+      if (!userId) {
+        console.error('METAMAP_WEBHOOK: userId no encontrado en metadata');
+        return res.status(400).send('userId missing');
+      }
+
+      console.log(`METAMAP_WEBHOOK: Aprobando usuario ${userId} como conductor`);
+
+      // Actualizar el tipo de cuenta a 'Driver' tras validación exitosa de MetaMap
+      await db.query(
+        "UPDATE users SET account_type = 'Driver', applied = 1 WHERE user_id = ?",
+        [userId]
+      );
+
+      // Aseguramos que tenga un registro básico en la tabla de drivers (estado verificado)
+      await db.query(
+        "INSERT IGNORE INTO drivers (user_id, license_number, license_expiry_date, approval_status, date_applied, date_approved) VALUES (?, 'VERIFIED_BY_METAMAP', CURDATE(), 'Approved', CURDATE(), NOW())",
+        [userId]
+      );
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('METAMAP_WEBHOOK_ERROR:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
 app.post('/notifications/send', async (req, res) => {
   try {
     const { user_id, message } = req.body;
@@ -3799,18 +3873,77 @@ app.post('/notifications/send', async (req, res) => {
   }
 });
 
+async function ensureRequiredTables(connection = db) {
+  console.log('Verificando/creando tablas críticas...');
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS discount_requests (
+      request_id int NOT NULL AUTO_INCREMENT,
+      user_id int NOT NULL,
+      type enum('STUDENT','SENIOR','PWD') NOT NULL,
+      id_reference_number varchar(100) DEFAULT NULL,
+      id_picture longblob,
+      id_picture_mime_type varchar(100) DEFAULT NULL,
+      status enum('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',
+      submitted_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at timestamp NULL DEFAULT NULL,
+      PRIMARY KEY (request_id),
+      KEY user_id (user_id),
+      CONSTRAINT discount_requests_ibfk_1 FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS drivers (
+      driver_id int NOT NULL AUTO_INCREMENT,
+      user_id int NOT NULL,
+      license_number varchar(64) NOT NULL,
+      license_expiry_date date NOT NULL,
+      license_type varchar(32) DEFAULT NULL,
+      restriction_code varchar(32) DEFAULT NULL,
+      approval_status enum('Pending','Approved','Rejected') DEFAULT 'Pending',
+      date_applied date DEFAULT NULL,
+      date_approved date DEFAULT NULL,
+      id_picture_front longblob,
+      id_picture_back longblob,
+      picture longblob,
+      PRIMARY KEY (driver_id),
+      KEY user_id (user_id),
+      CONSTRAINT drivers_ibfk_1 FOREIGN KEY (user_id) REFERENCES users (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `);
+
+  await connection.query(`
+    CREATE TABLE IF NOT EXISTS vehicles (
+      vehicle_id int NOT NULL AUTO_INCREMENT,
+      driver_id int NOT NULL,
+      vehicle_type enum('Car','Motorcycle','Van') NOT NULL,
+      plate_number varchar(32) NOT NULL,
+      model varchar(64) DEFAULT NULL,
+      color varchar(32) DEFAULT NULL,
+      capacity int DEFAULT NULL,
+      PRIMARY KEY (vehicle_id),
+      KEY driver_id (driver_id),
+      CONSTRAINT vehicles_ibfk_1 FOREIGN KEY (driver_id) REFERENCES drivers (driver_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  `);
+
+  console.log('Tablas discount_requests, drivers y vehicles listas.');
+}
+
 server.listen(PORT, '0.0.0.0', async () => {
   try {
     const connection = await db.getConnection();
+    await ensureRequiredTables(connection);
     connection.release();
-    console.log('Connected to MySQL successfully.');
+    console.log('Connected to MySQL and tables verified successfully.');
 
     const syncedRows = await syncApprovedDriverUserAccounts();
     if (syncedRows > 0) {
       console.log(`Synced ${syncedRows} approved driver user account(s).`);
     }
   } catch (error) {
-    console.error('Error connecting to MySQL:', error);
+    console.error('Error connecting to MySQL or creating tables:', error);
   }
 
   console.log(`API running on http://localhost:${PORT}`);
