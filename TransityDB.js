@@ -131,12 +131,15 @@ const DISCOUNT_REQUEST_METADATA_DIR = path.join(__dirname, 'discount_request_ass
 app.use(globalLimiter); // Aplicar límite global a todas las rutas
 app.use(express.json({ limit: '2mb' }));
 
+const db_host = (process.env.DB_HOST || '').trim().replace(/[\r\n]/g, '').replace(/^mysql:\/\//, '').split(':')[0];
+console.log(`[DB_CHECK] Intentando conectar al host: "${db_host}"`);
+
 const db = mysql.createPool({
-  host: requireEnv('DB_HOST').trim(),
+  host: db_host,
   port: Number(process.env.DB_PORT || 3306),
-  user: requireEnv('DB_USER').trim(),
-  password: requireEnv('DB_PASSWORD'),
-  database: requireEnv('DB_NAME').trim(),
+  user: (process.env.DB_USER || '').trim().replace(/[\r\n]/g, ''),
+  password: (process.env.DB_PASSWORD || '').trim().replace(/[\r\n]/g, ''),
+  database: (process.env.DB_NAME || 'defaultdb').trim().replace(/[\r\n]/g, ''),
   ssl: {
     rejectUnauthorized: false
   },
