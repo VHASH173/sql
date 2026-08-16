@@ -132,11 +132,11 @@ app.use(globalLimiter); // Aplicar límite global a todas las rutas
 app.use(express.json({ limit: '2mb' }));
 
 const db = mysql.createPool({
-  host: requireEnv('DB_HOST'),
+  host: requireEnv('DB_HOST').trim(),
   port: Number(process.env.DB_PORT || 3306),
-  user: requireEnv('DB_USER'),
+  user: requireEnv('DB_USER').trim(),
   password: requireEnv('DB_PASSWORD'),
-  database: requireEnv('DB_NAME'),
+  database: requireEnv('DB_NAME').trim(),
   ssl: {
     rejectUnauthorized: false
   },
@@ -3849,6 +3849,44 @@ app.post('/api/webhooks/metamap', async (req, res) => {
         "INSERT IGNORE INTO drivers (user_id, license_number, license_expiry_date, approval_status, date_applied, date_approved) VALUES (?, 'VERIFIED_BY_METAMAP', CURDATE(), 'Approved', CURDATE(), NOW())",
         [userId]
       );
+    }
+
+    res.status(200).send('OK');
+  } catch (error) {
+    console.error('METAMAP_WEBHOOK_ERROR:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+// Endpoint de Webhook para MetaMap (KYC)
+app.post('/api/webhooks/metamap', async (req, res) => {
+  try {
+    const { eventName, status, metadata } = req.body;
+    console.log(`METAMAP_WEBHOOK: Recibido evento ${eventName} con estado ${status}`);
+
+    if (status === 'verified') {
+      const userId = parseId(metadata?.userId);
+      if (!userId) {
+        console.error('METAMAP_WEBHOOK: userId no encontrado en metadata');
+        return res.status(400).send('userId missing');
+      }
+
+      console.log(`METAMAP_WEBHOOK: Aprobando usuario ${userId} como conductor`);
+
+      // Actualizar el tipo de cuenta a 'Driver' tras validación exitosa de MetaMap
+      // También establecemos profile_complete a 1 y applied a 1 para asegurar acceso
+      await db.query(
+        "UPDATE users SET account_type = 'Driver', profile_complete = 1, applied = 1 WHERE user_id = ?",
+        [userId]
+      );
+
+      // Creamos un registro base en drivers para que no falle el dashboard
+      await db.query(
+        "INSERT IGNORE INTO drivers (user_id, license_number, license_expiry_date, approval_status, date_applied, date_approved) VALUES (?, 'VERIFIED_BY_METAMAP', '2030-01-01', 'Approved', CURDATE(), NOW())",
+        [userId]
+      );
+
+      console.log(`METAMAP_WEBHOOK: Usuario ${userId} aprobado satisfactoriamente.`);
     }
 
     res.status(200).send('OK');

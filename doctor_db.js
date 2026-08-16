@@ -258,11 +258,11 @@ async function diagnose() {
     if (!loadEnv()) return;
 
     const config = {
-        host: process.env.DB_HOST,
+        host: process.env.DB_HOST.trim(),
         port: Number(process.env.DB_PORT || 3306),
-        user: process.env.DB_USER,
+        user: process.env.DB_USER.trim(),
         password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME,
+        database: process.env.DB_NAME.trim(),
         ssl: { rejectUnauthorized: false },
         connectTimeout: 10000
     };
