@@ -131,7 +131,11 @@ const DISCOUNT_REQUEST_METADATA_DIR = path.join(__dirname, 'discount_request_ass
 app.use(globalLimiter); // Aplicar límite global a todas las rutas
 app.use(express.json({ limit: '2mb' }));
 
-// Health check endpoint
+// Health check endpoints
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
