@@ -1,0 +1,22 @@
+{
+  "name": "transity-backend",
+  "version": "1.0.0",
+  "main": "TransityDB.js",
+  "scripts": {
+    "start": "node TransityDB.js",
+    "check": "node --check TransityDB.js",
+    "postinstall": "prisma skills sync || exit 0"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.6.2",
+    "mysql2": "^3.15.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@prisma/client": "^7.10.0",
+    "prisma": "^8.0.0-rc.17"
+  }
+}

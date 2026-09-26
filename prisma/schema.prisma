@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model discount_requests {
+  request_id           Int                      @id @default(autoincrement())
+  user_id              Int
+  type                 discount_requests_type
+  id_reference_number  String?                  @db.VarChar(100)
+  id_picture           Bytes?
+  id_picture_mime_type String?                  @db.VarChar(100)
+  status               discount_requests_status @default(PENDING)
+  submitted_at         DateTime                 @default(now()) @db.Timestamp(0)
+  reviewed_at          DateTime?                @db.Timestamp(0)
+  users                users                    @relation(fields: [user_id], references: [user_id], onDelete: Cascade, onUpdate: NoAction, map: "discount_requests_ibfk_1")
+
+  @@index([user_id], map: "user_id")
+}
+
+model drivers {
+  driver_id           Int                      @id @default(autoincrement())
+  user_id             Int
+  license_number      String                   @db.VarChar(64)
+  license_expiry_date DateTime                 @db.Date
+  license_type        String?                  @db.VarChar(32)
+  restriction_code    String?                  @db.VarChar(32)
+  approval_status     drivers_approval_status? @default(Pending)
+  date_applied        DateTime?                @db.Date
+  date_approved       DateTime?                @db.Date
+  id_picture_front    Bytes?
+  id_picture_back     Bytes?
+  picture             Bytes?
+
+  @@index([user_id], map: "user_id")
+}
+
+model users {
+  user_id           Int                 @id @default(autoincrement())
+  user_code         String?             @unique(map: "user_code") @db.VarChar(20)
+  first_name        String              @db.VarChar(45)
+  middle_name       String?             @db.VarChar(45)
+  last_name         String              @db.VarChar(45)
+  extension         String?             @db.VarChar(16)
+  date_of_birth     DateTime?           @db.Date
+  gender            users_gender?
+  email_address     String              @unique(map: "email_address") @db.VarChar(128)
+  password          String              @db.VarChar(64)
+  phone             String?             @db.VarChar(45)
+  address           String?             @db.VarChar(254)
+  city              String?             @db.VarChar(45)
+  region            String?             @db.VarChar(100)
+  zip_code          String?             @db.VarChar(45)
+  account_type      users_account_type? @default(Customer)
+  profile_complete  Boolean?            @default(false)
+  picture           Bytes?
+  phone_verified    Boolean?            @default(false)
+  applied           Boolean?            @default(false)
+  discount_requests discount_requests[]
+}
+
+model vehicles {
+  vehicle_id   Int                   @id @default(autoincrement())
+  driver_id    Int
+  vehicle_type vehicles_vehicle_type
+  plate_number String                @db.VarChar(32)
+  model        String?               @db.VarChar(64)
+  color        String?               @db.VarChar(32)
+  capacity     Int?
+
+  @@index([driver_id], map: "driver_id")
+}
+
+enum discount_requests_type {
+  STUDENT
+  SENIOR
+  PWD
+}
+
+enum vehicles_vehicle_type {
+  Car
+  Motorcycle
+  Van
+}
+
+enum discount_requests_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum drivers_approval_status {
+  Pending
+  Approved
+  Rejected
+}
+
+enum users_gender {
+  Male
+  Female
+  Others
+  Prefer_not_say @map("Prefer not say")
+}
+
+enum users_account_type {
+  Customer
+  Driver
+  Admin
+}
