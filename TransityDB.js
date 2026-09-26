@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 const http = require('http');
@@ -130,6 +130,11 @@ const DISCOUNT_REQUEST_METADATA_DIR = path.join(__dirname, 'discount_request_ass
 
 app.use(globalLimiter); // Aplicar límite global a todas las rutas
 app.use(express.json({ limit: '2mb' }));
+
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 const db_host = (process.env.DB_HOST || '').trim().replace(/[\r\n]/g, '').replace(/^mysql:\/\//, '').split(':')[0];
 console.log(`[DB_CHECK] Intentando conectar al host: "${db_host}"`);
