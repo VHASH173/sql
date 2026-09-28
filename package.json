@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "main": "TransityDB.js",
   "scripts": {
-    "start": "node TransityDB.js",
+    "start": "node fix_missing_tables.js && node TransityDB.js",
     "check": "node --check TransityDB.js",
-    "postinstall": "prisma skills sync || exit 0"
+    "postinstall": "prisma generate || exit 0"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -16,7 +16,7 @@
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
-    "@prisma/client": "^7.10.0",
-    "prisma": "^8.0.0-rc.17"
+    "@prisma/client": "^6.19.3",
+    "prisma": "^6.19.3"
   }
 }
